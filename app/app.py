@@ -1,84 +1,95 @@
-# clima_mvp/app/app.py
+import streamlit as st
 import sys
 import os
+import pandas as pd
 
+# Adiciona o diretório raiz do projeto ao sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-import streamlit as st
-import pandas as pd
-from core.modelo_clima import criar_banco_de_dados_e_tabelas, inserir_dados_nas_tabelas, treinar_modelo, carregar_modelo_e_prever, dropar_banco_de_dados
+from core import modelo_clima
+from core.chatbot.rules import answer_clima_questions
 
-st.set_page_config(page_title="Previsão de Precipitação", page_icon="🌧️", layout="wide")
+st.set_page_config(layout="wide")
 st.title("🌧️ Previsão de Precipitação")
+
 st.markdown("""
-    Este aplicativo executa um **pipeline de dados completo** para um projeto de machine learning.
-    O objetivo é treinar um **modelo de Regressão Linear** para prever a precipitação.
+    Este aplicativo executa um pipeline de Machine Learning de ponta a ponta para prever a precipitação.
+    Siga os passos na barra lateral para criar o banco de dados, treinar o modelo e fazer previsões.
 """)
 
-st.sidebar.header("⚙️ Controle de Pipeline")
-btn_criar_db = st.sidebar.button("1. Criar e Popular o Banco")
-btn_dropar_db = st.sidebar.button("3. Excluir o Banco de Dados")
+st.sidebar.title("Passos do Pipeline")
+st.sidebar.markdown("""
+    Siga a ordem dos botões para executar o projeto.
+""")
 
-st.sidebar.markdown("---")
-st.sidebar.subheader("Opção de Modelo")
-model_option = st.sidebar.radio("Escolha a ação para o modelo:", ("Treinar Modelo", "Usar Modelo Salvo"))
-btn_executar_modelo = st.sidebar.button("2. Executar Ação do Modelo")
-
-if btn_criar_db:
+# Botão para criar e popular o banco de dados
+if st.sidebar.button('1. Criar e Popular o Banco', help='Cria as tabelas SQL e insere os dados das tabelas SOR para SOT e SPEC.'):
     with st.spinner('Criando banco de dados e inserindo dados...'):
-        sucesso_criar, msg_criar = criar_banco_de_dados_e_tabelas()
-        if sucesso_criar:
-            st.success(msg_criar)
-            sucesso_inserir, msg_inserir = inserir_dados_nas_tabelas()
-            if sucesso_inserir:
-                st.success(msg_inserir)
-            else:
-                st.error(msg_inserir)
-        else:
-            st.error(msg_criar)
+        sucesso, mensagem = modelo_clima.criar_banco_de_dados_e_tabelas()
+        st.write(mensagem)
+        if sucesso:
+            sucesso_pop, mensagem_pop = modelo_clima.inserir_dados_nas_tabelas()
+            st.write(mensagem_pop)
 
-if btn_executar_modelo:
-    with st.spinner('Executando a ação do modelo...'):
-        if model_option == "Treinar Modelo":
-            sucesso_modelo, modelo, metricas, coef_df, msg = treinar_modelo()
-        else:
-            sucesso_modelo, modelo, metricas, coef_df, msg = carregar_modelo_e_prever()
+# Botão para treinar o modelo
+if st.sidebar.button('2. Treinar o Modelo', help='Treina um modelo de Regressão Linear com os dados da tabela SPEC.'):
+    with st.spinner('Treinando o modelo...'):
+        sucesso, modelo, metricas, coef_df, mensagem = modelo_clima.treinar_modelo()
+        st.write(mensagem)
+        if sucesso:
+            st.session_state['metrics'] = metricas
+            st.session_state['coef_df'] = coef_df
+            st.subheader("Métricas de Desempenho do Modelo")
+            st.json(metricas)
+            st.subheader("Coeficientes do Modelo")
+            st.dataframe(coef_df)
 
-        if sucesso_modelo:
-            st.success(msg)
-            
-            st.header("📈 Resultados da Análise")
-            st.markdown("""
-                As métricas a seguir avaliam o desempenho do modelo em prever a precipitação:
-                * **MAE (Erro Absoluto Médio):** A média da diferença absoluta entre as previsões e os valores reais. Quanto menor, melhor.
-                * **MSE (Erro Quadrático Médio):** A média do quadrado das diferenças. Puni os erros maiores, sendo mais sensível a outliers.
-                * **RMSE (Raiz do Erro Quadrático Médio):** A raiz quadrada do MSE, na mesma unidade da variável de destino. Facilita a interpretação.
-                * **R-quadrado (R²):** Indica a proporção da variabilidade da variável de destino que é explicada pelo modelo. Um valor mais próximo de 1 indica que o modelo se ajusta bem aos dados.
-            """)
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                st.metric("MAE", f"**{metricas['MAE']:.2f}**")
-            with col2:
-                st.metric("MSE", f"**{metricas['MSE']:.2f}**")
-            with col3:
-                st.metric("RMSE", f"**{metricas['RMSE']:.2f}**")
-            with col4:
-                st.metric("R-quadrado", f"**{metricas['R2']:.2%}**")
+# Botão para usar o modelo salvo
+if st.sidebar.button('3. Usar o Modelo Salvo', help='Carrega o modelo salvo para fazer predições.'):
+    with st.spinner('Carregando modelo e fazendo previsões...'):
+        sucesso, modelo, metricas, coef_df, mensagem = modelo_clima.carregar_modelo_e_prever()
+        st.write(mensagem)
+        if sucesso:
+            st.session_state['metrics'] = metricas
+            st.session_state['coef_df'] = coef_df
+            st.subheader("Métricas de Desempenho do Modelo (Conjunto Completo)")
+            st.json(metricas)
+            st.subheader("Coeficientes do Modelo")
+            st.dataframe(coef_df)
+        
+# Botão para dropar o banco de dados
+if st.sidebar.button('4. Excluir o Banco de Dados', help='Remove o arquivo do banco de dados para iniciar o processo do zero.'):
+    with st.spinner('Excluindo o banco de dados...'):
+        sucesso, mensagem = modelo_clima.dropar_banco_de_dados()
+        st.write(mensagem)
 
-            st.subheader("📚 Coeficientes do Modelo (Importância das Variáveis)")
-            st.markdown("""
-                Os coeficientes indicam o "peso" de cada variável na previsão da precipitação.
-                * **Valores positivos:** Aumento na variável corresponde a um aumento na precipitação prevista.
-                * **Valores negativos:** Aumento na variável corresponde a uma diminuição na precipitação prevista.
-                * **Magnitude:** O valor absoluto do coeficiente indica a força do impacto na previsão.
-            """)
-            st.dataframe(coef_df, use_container_width=True)
-        else:
-            st.error(f"Erro ao executar a ação do modelo: {msg}")
+# --- Seção do Chatbot ---
+st.markdown("---")
+st.subheader("🤖 Chatbot de Análise do Modelo")
 
-if btn_dropar_db:
-    sucesso_drop, msg_drop = dropar_banco_de_dados()
-    if sucesso_drop:
-        st.success(msg_drop)
-    else:
-        st.warning(msg_drop)
+# Inicializa o histórico do chat
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# Exibe mensagens do histórico
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+# Obtém as métricas e coeficientes do estado da sessão
+metrics = st.session_state.get('metrics', {})
+coef_df = st.session_state.get('coef_df', pd.DataFrame())
+
+# Lida com a entrada do usuário
+if prompt := st.chat_input("Pergunte sobre as variáveis ou métricas..."):
+    # Adiciona a mensagem do usuário ao histórico
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    # Gera a resposta do chatbot
+    with st.chat_message("assistant"):
+        with st.spinner("Pensando..."):
+            response = answer_clima_questions(prompt, metrics, coef_df)
+            st.markdown(response)
+            st.session_state.messages.append({"role": "assistant", "content": response})
