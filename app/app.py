@@ -23,7 +23,7 @@ st.sidebar.markdown("""
 """)
 
 # Botão para criar e popular o banco de dados
-if st.sidebar.button('1. Criar e Popular o Banco', help='Cria as tabelas SQL e insere os dados das tabelas SOR para SOT e SPEC.'):
+if st.sidebar.button('1. Criar e Popular o Banco', help='Cria as tabelas SQL e insere os dados das tabelas SOR para SOT e SPEC.', key='create_db'):
     with st.spinner('Criando banco de dados e inserindo dados...'):
         sucesso, mensagem = modelo_clima.criar_banco_de_dados_e_tabelas()
         st.write(mensagem)
@@ -32,7 +32,7 @@ if st.sidebar.button('1. Criar e Popular o Banco', help='Cria as tabelas SQL e i
             st.write(mensagem_pop)
 
 # Botão para treinar o modelo
-if st.sidebar.button('2. Treinar o Modelo', help='Treina um modelo de Regressão Linear com os dados da tabela SPEC.'):
+if st.sidebar.button('2. Treinar o Modelo', help='Treina um modelo de Regressão Linear com os dados da tabela SPEC.', key='train_model'):
     with st.spinner('Treinando o modelo...'):
         sucesso, modelo, metricas, coef_df, mensagem = modelo_clima.treinar_modelo()
         st.write(mensagem)
@@ -45,7 +45,7 @@ if st.sidebar.button('2. Treinar o Modelo', help='Treina um modelo de Regressão
             st.dataframe(coef_df)
 
 # Botão para usar o modelo salvo
-if st.sidebar.button('3. Usar o Modelo Salvo', help='Carrega o modelo salvo para fazer predições.'):
+if st.sidebar.button('3. Usar o Modelo Salvo', help='Carrega o modelo salvo para fazer predições.', key='use_saved_model'):
     with st.spinner('Carregando modelo e fazendo previsões...'):
         sucesso, modelo, metricas, coef_df, mensagem = modelo_clima.carregar_modelo_e_prever()
         st.write(mensagem)
@@ -58,7 +58,7 @@ if st.sidebar.button('3. Usar o Modelo Salvo', help='Carrega o modelo salvo para
             st.dataframe(coef_df)
         
 # Botão para dropar o banco de dados
-if st.sidebar.button('4. Excluir o Banco de Dados', help='Remove o arquivo do banco de dados para iniciar o processo do zero.'):
+if st.sidebar.button('4. Excluir o Banco de Dados', help='Remove o arquivo do banco de dados para iniciar o processo do zero.', key='drop_db'):
     with st.spinner('Excluindo o banco de dados...'):
         sucesso, mensagem = modelo_clima.dropar_banco_de_dados()
         st.write(mensagem)
@@ -81,7 +81,7 @@ metrics = st.session_state.get('metrics', {})
 coef_df = st.session_state.get('coef_df', pd.DataFrame())
 
 # Lida com a entrada do usuário
-if prompt := st.chat_input("Pergunte sobre as variáveis ou métricas..."):
+if prompt := st.chat_input("Pergunte sobre as variáveis ou métricas...", key='chat_input'):
     # Adiciona a mensagem do usuário ao histórico
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
