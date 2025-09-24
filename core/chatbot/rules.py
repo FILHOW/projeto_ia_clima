@@ -1,85 +1,35 @@
-import streamlit as st
-import sys
-import os
 import pandas as pd
 
-# Adiciona o diretório raiz do projeto ao sys.path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-from core import modelo_clima
-
-def answer_clima_questions(question: str, metrics: dict, importances_df):
-
+def answer_clima_questions(question: str, metrics: dict, coef_df: pd.DataFrame):
+    """
+    Responde perguntas sobre o modelo de clima, métricas, variáveis importantes, pipeline e privacidade.
+    - question: pergunta do usuário
+    - metrics: dicionário de métricas do modelo
+    - coef_df: DataFrame com variáveis e coeficientes do modelo
+    """
     q = (question or "").lower()
 
-    # Botão para criar e popular o banco de dados
-    if st.sidebar.button('1. Criar e Popular o Banco', help='Cria as tabelas SQL e insere os dados das tabelas SOR para SOT e SPEC.'):
-        with st.spinner('Criando banco de dados e inserindo dados...'):
-            sucesso, mensagem = modelo_clima.criar_banco_de_dados_e_tabelas()
-            st.write(mensagem)
-            if sucesso:
-                sucesso_pop, mensagem_pop = modelo_clima.inserir_dados_nas_tabelas()
-                st.write(mensagem_pop)
+    if "importan" in q or "importân" in q or "variáve" in q or "features" in q:
+        if coef_df is not None and not coef_df.empty:
+            top = coef_df.sort_values(by="Coeficiente", key=abs, ascending=False).head(5)
+            top_str = ", ".join(top["Variável"].astype(str))
+            return f"As variáveis mais influentes são: {top_str}. (Baseado nos coeficientes do modelo)"
+        else:
+            return "Os coeficientes do modelo ainda não estão disponíveis. Treine ou carregue o modelo."
 
-    # Botão para treinar o modelo
-    if st.sidebar.button('2. Treinar o Modelo', help='Treina um modelo de Regressão Linear com os dados da tabela SPEC.'):
-        with st.spinner('Treinando o modelo...'):
-            sucesso, modelo, metricas, coef_df, mensagem = modelo_clima.treinar_modelo()
-            st.write(mensagem)
-            if sucesso:
-                st.session_state['metrics'] = metricas
-                st.session_state['coef_df'] = coef_df
-                st.subheader("Métricas de Desempenho do Modelo")
-                st.json(metricas)
-                st.subheader("Coeficientes do Modelo")
-                st.dataframe(coef_df)
+    if "métric" in q or "score" in q or "acur" in q or "rmse" in q or "mae" in q or "r2" in q:
+        if metrics:
+            return f"Métricas do modelo: {metrics}"
+        else:
+            return "As métricas do modelo ainda não estão disponíveis. Treine ou carregue o modelo."
 
-    # Botão para usar o modelo salvo
-    if st.sidebar.button('3. Usar o Modelo Salvo', help='Carrega o modelo salvo para fazer predições.'):
-        with st.spinner('Carregando modelo e fazendo previsões...'):
-            sucesso, modelo, metricas, coef_df, mensagem = modelo_clima.carregar_modelo_e_prever()
-            st.write(mensagem)
-            if sucesso:
-                st.session_state['metrics'] = metricas
-                st.session_state['coef_df'] = coef_df
-                st.subheader("Métricas de Desempenho do Modelo (Conjunto Completo)")
-                st.json(metricas)
-                st.subheader("Coeficientes do Modelo")
-                st.dataframe(coef_df)
-            
-    # Botão para dropar o banco de dados
-    if st.sidebar.button('4. Excluir o Banco de Dados', help='Remove o arquivo do banco de dados para iniciar o processo do zero.'):
-        with st.spinner('Excluindo o banco de dados...'):
-            sucesso, mensagem = modelo_clima.dropar_banco_de_dados()
-            st.write(mensagem)
+    if "como foi treinado" in q or "pipeline" in q or "como funciona" in q:
+        return ("O pipeline do projeto aplica ETL nos dados brutos, faz one-hot encoding para variáveis categóricas, "
+                "e treina um modelo de Regressão Linear para prever precipitação. O modelo é salvo e pode ser reutilizado.")
 
-    # --- Seção do Chatbot ---
-    st.markdown("---")
-    st.subheader("🤖 Chatbot de Análise do Modelo")
+    if "privacid" in q or "lgpd" in q:
+        return ("No MVP, evitamos dados sensíveis e não persistimos dados pessoais. "
+                "Para produção: aplicar anonimização, consentimento expresso, minimização e auditoria de dados.")
 
-    # Inicializa o histórico do chat
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-
-    # Exibe mensagens do histórico
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-
-    # Obtém as métricas e coeficientes do estado da sessão
-    metrics = st.session_state.get('metrics', {})
-    coef_df = st.session_state.get('coef_df', pd.DataFrame())
-
-    # Lida com a entrada do usuário
-    if prompt := st.chat_input("Pergunte sobre as variáveis ou métricas..."):
-        # Adiciona a mensagem do usuário ao histórico
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
-
-        # Gera a resposta do chatbot
-        with st.chat_message("assistant"):
-            with st.spinner("Pensando..."):
-                response = answer_clima_questions(prompt, metrics, coef_df)
-                st.markdown(response)
-                st.session_state.messages.append({"role": "assistant", "content": response})
+    return ("Posso responder sobre variáveis importantes, métricas do modelo, pipeline e privacidade. "
+            "Pergunte, por exemplo: 'Quais variáveis mais importam?' ou 'Quais as métricas do modelo?'")
